@@ -107,4 +107,15 @@ module Kamal::Utils
   def older_version?(version, other_version)
     Gem::Version.new(version.delete_prefix("v")) < Gem::Version.new(other_version.delete_prefix("v"))
   end
+
+  def display_file_size(file_path)
+    size_bytes = File.size(file_path)
+    if size_bytes < 1024
+      "#{size_bytes} bytes"
+    elsif size_bytes < 1024 * 1024
+      "#{(size_bytes.to_f / 1024).round(2)} KB"
+    else
+      "#{(size_bytes.to_f / (1024 * 1024)).round(2)} MB"
+    end
+  end
 end

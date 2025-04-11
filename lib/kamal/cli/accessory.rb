@@ -256,6 +256,54 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
     end
   end
 
+  desc "backup NAME", "Create a backup from an accessory container (db or redis)"
+  option :compress, type: :boolean, default: true, desc: "Compress the backup file"
+  option :output, type: :string, desc: "Local directory to store backups (default: ./backups)"
+  def backup(name)
+    confirming "This will create a database backup from an accessory container." do
+      with_lock do
+        with_accessory(name) do |accessory, hosts|
+          on(hosts) do
+            db_type, remote_path, filename = accessory.db_backup_prepare
+            say "Creating backup from #{name} (#{db_type})", :green
+
+            # Execute backup on host
+            on(hosts) { execute *accessory.db_backup_execute(remote_path) }
+
+            # Setup local directory
+            local_dir = File.expand_path(options[:output] || "backups", Dir.pwd)
+            FileUtils.mkdir_p(local_dir)
+            local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
+
+            say "Downloading backup to #{local_file}", :green
+            on(hosts) do
+              if options[:compress]
+                capture("docker exec #{accessory.service_name} cat #{remote_path} | gzip > #{local_file}")
+              else
+                capture("docker exec #{accessory.service_name} cat #{remote_path} > #{local_file}")
+              end
+            end
+
+            # Clean up remote file
+            say("Cleaning up remote file", :yellow)
+            on(hosts) do
+              accessory.db_backup_cleanup(remote_path)
+            end
+
+            # Verify backup file
+            if File.exist?(local_file) && File.size(local_file) > 0
+              say "Backup complete: #{local_file}", :green
+              say "Size: #{Kamal::Utils.display_file_size(local_file)}", :green
+            else
+              say "Backup file is empty or missing", :red
+              raise
+            end
+          end
+        end
+      end
+    end
+  end
+
   private
     def with_accessory(name)
       if KAMAL.config.accessory(name)

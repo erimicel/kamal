@@ -1,5 +1,6 @@
 class Kamal::Commands::Accessory < Kamal::Commands::Base
   include Proxy
+  include Backup
 
   attr_reader :accessory_config
   delegate :service_name, :image, :hosts, :port, :files, :directories, :cmd,
@@ -104,6 +105,34 @@ class Kamal::Commands::Accessory < Kamal::Commands::Base
 
   def ensure_env_directory
     make_directory env_directory
+  end
+
+  def db_backup_prepare
+    db_type = detect_database_type
+    timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
+    filename = "#{name}_#{db_type}_backup_#{timestamp}.sql"
+    remote_path = "/tmp/#{filename}"
+
+    raise "Unsupported database type for #{name}." unless db_type
+
+    [ db_type, remote_path, filename ]
+  end
+
+  def db_backup_execute(remote_path)
+    db_type = detect_database_type
+
+    case db_type
+    when "mysql"
+      execute_in_existing_container "bash", "-c",
+        "mysqldump --single-transaction -u $BACKUP_DB_USER -p$BACKUP_DB_PASSWORD $BACKUP_DB_DATABASE > #{remote_path}"
+    when "postgresql"
+      execute_in_existing_container "bash", "-c",
+        "PGPASSWORD=$BACKUP_DB_PASSWORD pg_dump -U $BACKUP_DB_USER -d $BACKUP_DB_DATABASE -F plain > #{remote_path}"
+    end
+  end
+
+  def db_backup_cleanup(remote_path)
+    execute_in_existing_container "rm", remote_path
   end
 
   private
