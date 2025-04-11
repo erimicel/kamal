@@ -4,18 +4,9 @@ module Kamal::Commands::Accessory::Backup
 
     case type
     when :mysql, :postgresql
-      unless backup_env_variables_set?
-        # TODO: Add port env?
-        say "Backup not supported for #{service_name} (missing env variables)", :red
-        say "Please set BACKUP_DB_USER, BACKUP_DB_PASSWORD, and BACKUP_DB_NAME", :red
-        raise
-      end
-
       db_backup(type, options)
     when :redis
       redis_backup(options)
-    else
-      raise "Backup not supported for #{service_name} (#{type || 'unknown type'})"
     end
   end
 
@@ -37,6 +28,11 @@ module Kamal::Commands::Accessory::Backup
     else
       nil
     end
+  end
+
+  def backup_env_variables_set?
+    # TODO: Add port env?
+    %w[ BACKUP_DB_USER BACKUP_DB_PASSWORD BACKUP_DB_NAME ].all? { |var| env_args.key?(var) }
   end
 
   private
@@ -67,9 +63,5 @@ module Kamal::Commands::Accessory::Backup
       execute_in_existing_container "bash", "-c", "cp /data/dump.rdb #{remote_path}"
 
       [ remote_path, filename ]
-    end
-
-    def backup_env_variables_set?
-      %w[ BACKUP_DB_USER BACKUP_DB_PASSWORD BACKUP_DB_NAME ].all? { |var| ENV.key?(var) }
     end
 end

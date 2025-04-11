@@ -269,9 +269,22 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
             raise
           end
 
+          unless accessory.backup_env_variables_set?
+            say "Backup not supported for #{name} (missing env variables)", :red
+            say "Please set BACKUP_DB_USER, BACKUP_DB_PASSWORD, and BACKUP_DB_NAME", :red
+            raise
+          end
+
           say "Creating backup from #{name} (#{type})", :green
           remote_path, filename = nil
-          on(hosts) { remote_path, filename = accessory.backup }
+          on(hosts) do
+            begin
+              remote_path, filename = accessory.backup
+            rescue => e
+              say "Backup failed: #{e.message}", :red
+              raise
+            end
+          end
 
           # Setup local directory
           compress = options[:compress]
