@@ -264,17 +264,24 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
       with_lock do
         with_accessory(name) do |accessory, hosts|
           on(hosts) do
-            db_type, remote_path, filename = accessory.db_backup_prepare
-            say "Creating backup from #{name} (#{db_type})", :green
+            type = accessory.detect_accessory_type
+            if type.nil?
+              say("Backup not supported for #{name} (unknown type)", :red)
+              raise
+            end
+
+            say "Creating backup from #{name} (#{type})", :green
 
             # Execute backup on host
-            on(hosts) { execute *accessory.db_backup_execute(remote_path) }
+            remote_path, filename = nil
+            on(hosts) { remote_path, filename = accessory.backup }
 
             # Setup local directory
             local_dir = File.expand_path(options[:output] || "backups", Dir.pwd)
             FileUtils.mkdir_p(local_dir)
             local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
 
+            # Download the file
             say "Downloading backup to #{local_file}", :green
             on(hosts) do
               if options[:compress]
@@ -287,7 +294,7 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
             # Clean up remote file
             say("Cleaning up remote file", :yellow)
             on(hosts) do
-              accessory.db_backup_cleanup(remote_path)
+              accessory.backup_cleanup(remote_path)
             end
 
             # Verify backup file

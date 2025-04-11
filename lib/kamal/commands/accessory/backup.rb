@@ -12,6 +12,10 @@ module Kamal::Commands::Accessory::Backup
     end
   end
 
+  def backup_cleanup(remote_path)
+    execute_in_existing_container "rm", remote_path
+  end
+
   def detect_accessory_type
     return nil unless image
 
@@ -53,10 +57,7 @@ module Kamal::Commands::Accessory::Backup
     filename = "#{name}_redis_backup_#{timestamp}.rdb"
     remote_path = "/tmp/#{filename}"
 
-    # Redis can use SAVE command to trigger backup to disk
     execute_in_existing_container "redis-cli", "SAVE"
-
-    # Copy the RDB file to our temporary location
     execute_in_existing_container "bash", "-c", "cp /data/dump.rdb #{remote_path}"
 
     [ remote_path, filename ]
