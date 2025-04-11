@@ -32,7 +32,7 @@ module Kamal::Commands::Accessory::Backup
 
   def backup_env_variables_set?
     # TODO: Add port env?
-    %w[ BACKUP_DB_USER BACKUP_DB_PASSWORD BACKUP_DB_NAME ].all? { |var| env_args.key?(var) }
+    %w[ BACKUP_DB_USER BACKUP_DB_PASSWORD BACKUP_DB_NAME ].all? { |var| env_args.include?(var) }
   end
 
   private
