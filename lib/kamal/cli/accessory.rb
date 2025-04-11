@@ -263,48 +263,46 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
     confirming "This will create a database backup from an accessory container." do
       with_lock do
         with_accessory(name) do |accessory, hosts|
+          type = accessory.detect_accessory_type
+          if type.nil?
+            say "Backup not supported for #{name} (unknown type)", :red
+            raise
+          end
+
+          say "Creating backup from #{name} (#{type})", :green
+
+          # Execute backup on host
+          remote_path, filename = nil
+          on(hosts) { remote_path, filename = accessory.backup }
+
+          # Setup local directory
+          local_dir = File.expand_path(options[:output] || "backups", Dir.pwd)
+          FileUtils.mkdir_p(local_dir)
+          local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
+
+          # Download the file
+          say "Downloading backup to #{local_file}", :green
           on(hosts) do
-            type = accessory.detect_accessory_type
-            if type.nil?
-              say("Backup not supported for #{name} (unknown type)", :red)
-              raise
-            end
-
-            say "Creating backup from #{name} (#{type})", :green
-
-            # Execute backup on host
-            remote_path, filename = nil
-            on(hosts) { remote_path, filename = accessory.backup }
-
-            # Setup local directory
-            local_dir = File.expand_path(options[:output] || "backups", Dir.pwd)
-            FileUtils.mkdir_p(local_dir)
-            local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
-
-            # Download the file
-            say "Downloading backup to #{local_file}", :green
-            on(hosts) do
-              if options[:compress]
-                capture("docker exec #{accessory.service_name} cat #{remote_path} | gzip > #{local_file}")
-              else
-                capture("docker exec #{accessory.service_name} cat #{remote_path} > #{local_file}")
-              end
-            end
-
-            # Clean up remote file
-            say("Cleaning up remote file", :yellow)
-            on(hosts) do
-              accessory.backup_cleanup(remote_path)
-            end
-
-            # Verify backup file
-            if File.exist?(local_file) && File.size(local_file) > 0
-              say "Backup complete: #{local_file}", :green
-              say "Size: #{Kamal::Utils.display_file_size(local_file)}", :green
+            if options[:compress]
+              capture("docker exec #{accessory.service_name} cat #{remote_path} | gzip > #{local_file}")
             else
-              say "Backup file is empty or missing", :red
-              raise
+              capture("docker exec #{accessory.service_name} cat #{remote_path} > #{local_file}")
             end
+          end
+
+          # Clean up remote file
+          say("Cleaning up remote file", :yellow)
+          on(hosts) do
+            accessory.backup_cleanup(remote_path)
+          end
+
+          # Verify backup file
+          if File.exist?(local_file) && File.size(local_file) > 0
+            say "Backup complete: #{local_file}", :green
+            say "Size: #{Kamal::Utils.display_file_size(local_file)}", :green
+          else
+            say "Backup file is empty or missing", :red
+            raise
           end
         end
       end
