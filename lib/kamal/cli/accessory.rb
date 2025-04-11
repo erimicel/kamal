@@ -274,13 +274,14 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
           on(hosts) { remote_path, filename = accessory.backup }
 
           # Setup local directory
+          compress = options[:compress]
           local_dir = File.expand_path(options[:output] || "backups", Dir.pwd)
           FileUtils.mkdir_p(local_dir)
-          local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
+          local_file = File.join(local_dir, compress ? "#{filename}.gz" : filename)
 
           say "Downloading backup to #{local_file}", :green
           on(hosts) do
-            if options[:compress]
+            if compress
               capture_with_info(*accessory.execute_in_existing_container("cat #{remote_path} | gzip > #{local_file}"))
             else
               capture_with_info(*accessory.execute_in_existing_container("cat #{remote_path} > #{local_file}"))
