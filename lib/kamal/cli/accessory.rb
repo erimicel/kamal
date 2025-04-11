@@ -270,8 +270,6 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
           end
 
           say "Creating backup from #{name} (#{type})", :green
-
-          # Execute backup on host
           remote_path, filename = nil
           on(hosts) { remote_path, filename = accessory.backup }
 
@@ -280,21 +278,17 @@ class Kamal::Cli::Accessory < Kamal::Cli::Base
           FileUtils.mkdir_p(local_dir)
           local_file = File.join(local_dir, options[:compress] ? "#{filename}.gz" : filename)
 
-          # Download the file
           say "Downloading backup to #{local_file}", :green
           on(hosts) do
             if options[:compress]
-              capture("docker exec #{accessory.service_name} cat #{remote_path} | gzip > #{local_file}")
+              capture_with_info(*accessory.execute_in_existing_container("cat #{remote_path} | gzip > #{local_file}"))
             else
-              capture("docker exec #{accessory.service_name} cat #{remote_path} > #{local_file}")
+              capture_with_info(*accessory.execute_in_existing_container("cat #{remote_path} > #{local_file}"))
             end
           end
 
-          # Clean up remote file
           say("Cleaning up remote file", :yellow)
-          on(hosts) do
-            accessory.backup_cleanup(remote_path)
-          end
+          on(hosts) { execute *accessory.backup_cleanup(remote_path) }
 
           # Verify backup file
           if File.exist?(local_file) && File.size(local_file) > 0
