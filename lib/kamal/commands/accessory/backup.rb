@@ -23,6 +23,22 @@ module Kamal::Commands::Accessory::Backup
     execute_in_existing_container "rm", remote_path
   end
 
+  def detect_accessory_type
+    return nil unless image
+
+    image_name = image.downcase
+
+    if image_name.include?("mysql") || image_name.include?("mariadb")
+      :mysql
+    elsif image_name.include?("postgres")
+      :postgresql
+    elsif image_name.include?("redis")
+      :redis
+    else
+      nil
+    end
+  end
+
   private
     def db_backup(type, options = {})
       timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
@@ -51,22 +67,6 @@ module Kamal::Commands::Accessory::Backup
       execute_in_existing_container "bash", "-c", "cp /data/dump.rdb #{remote_path}"
 
       [ remote_path, filename ]
-    end
-
-    def detect_accessory_type
-      return nil unless image
-
-      image_name = image.downcase
-
-      if image_name.include?("mysql") || image_name.include?("mariadb")
-        :mysql
-      elsif image_name.include?("postgres")
-        :postgresql
-      elsif image_name.include?("redis")
-        :redis
-      else
-        nil
-      end
     end
 
     def backup_env_variables_set?
